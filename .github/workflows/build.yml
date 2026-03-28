@@ -32,13 +32,27 @@ jobs:
       run: |
         pip install buildozer==1.5.0 cython==0.29.33
 
-    - name: Accept Android SDK licenses and install components
+    - name: Set up Android SDK at buildozer path
       run: |
-        SDK_DIR=/usr/local/lib/android/sdk
-        SDKMANAGER="$SDK_DIR/cmdline-tools/latest/bin/sdkmanager"
-        yes | $SDKMANAGER --licenses || true
-        $SDKMANAGER "platforms;android-33" "build-tools;33.0.2" "platform-tools" || true
-        yes | $SDKMANAGER --licenses || true
+        SDK_DIR=$HOME/.buildozer/android/platform/android-sdk
+        mkdir -p $SDK_DIR/cmdline-tools
+
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
+        unzip -q cmdline-tools.zip -d $SDK_DIR/cmdline-tools
+        mv $SDK_DIR/cmdline-tools/cmdline-tools $SDK_DIR/cmdline-tools/latest
+
+        # Legacy symlink so older p4a code can find sdkmanager
+        mkdir -p $SDK_DIR/tools/bin
+        ln -sf $SDK_DIR/cmdline-tools/latest/bin/sdkmanager $SDK_DIR/tools/bin/sdkmanager
+        ln -sf $SDK_DIR/cmdline-tools/latest/bin/avdmanager $SDK_DIR/tools/bin/avdmanager
+
+        export PATH="$SDK_DIR/cmdline-tools/latest/bin:$PATH"
+        yes | sdkmanager --sdk_root=$SDK_DIR --licenses || true
+        sdkmanager --sdk_root=$SDK_DIR \
+          "platforms;android-33" \
+          "build-tools;33.0.2" \
+          "platform-tools"
+        yes | sdkmanager --sdk_root=$SDK_DIR --licenses || true
 
     - name: Cache buildozer global directory
       uses: actions/cache@v4
@@ -48,13 +62,24 @@ jobs:
 
     - name: Build APK
       env:
-        ANDROIDSDK: /usr/local/lib/android/sdk
-        ANDROIDAPI: "33"
-        ANDROIDMINAPI: "21"
         JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+        ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
       run: |
         export PATH="$HOME/.local/bin:$JAVA_HOME/bin:$PATH"
         buildozer android debug 2>&1
+
+    - name: Show Gradle log on failure
+      if: failure()
+      run: |
+        GRADLE_LOG=$(find $HOME -name "*.log" -path "*/dists/*" 2>/dev/null | head -5)
+        for f in $GRADLE_LOG; do echo "=== $f ==="; tail -50 "$f"; done
+        DIST_DIR=$(find $HOME -name "gradlew" -path "*/dists/*" 2>/dev/null | head -1 | xargs dirname)
+        if [ -n "$DIST_DIR" ]; then
+          echo "=== Gradle wrapper properties ==="
+          cat $DIST_DIR/gradle/wrapper/gradle-wrapper.properties 2>/dev/null || true
+          echo "=== local.properties ==="
+          cat $DIST_DIR/local.properties 2>/dev/null || true
+        fi
 
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
