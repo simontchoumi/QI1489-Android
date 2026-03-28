@@ -56,7 +56,10 @@ android.enable_androidx = True
 android.presplash_color = #0A0E27
 
 # (list) The Android archs to build for, choices: armeabi-v7a, arm64-v8a, x86, x86_64
-android.archs = arm64-v8a, armeabi-v7a
+android.archs = arm64-v8a
+
+# Use latest python-for-android (fixes -luuid missing on NDK)
+p4a.branch = master
 
 # (bool) enables Android auto backup feature (Android API >=23)
 android.allow_backup = True
