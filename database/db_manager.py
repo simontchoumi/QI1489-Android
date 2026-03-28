@@ -15,9 +15,11 @@ def get_db_path():
     if platform == 'android':
         try:
             from android.storage import app_storage_path
-            return os.path.join(app_storage_path(), 'qi1489.db')
+            path = app_storage_path()
         except Exception:
-            return '/data/data/org.smjxgame.qi1489/qi1489.db'
+            path = os.environ.get('ANDROID_PRIVATE', '/data/data/org.smjxgame.qi1489')
+        os.makedirs(path, exist_ok=True)
+        return os.path.join(path, 'qi1489.db')
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     return os.path.join(base, 'qi1489.db')
 
